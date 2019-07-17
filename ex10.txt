@@ -1,0 +1,353 @@
+import java.awt.*;
+import java.awt.event.*;
+import javax.swing.*;
+
+import java.util.Random;
+public class DragonRideFrame extends JFrame
+{    
+    // components
+    private JPanel           contentpane;
+    private JLabel           drawpane;
+    private JButton          offButton, rideButton;
+    private JToggleButton [] speedToggles;
+    private JTextField       greetText;
+    private JComboBox        boyCombo, dragonCombo;
+    private JLabel           boyLabel, dragonLabel;
+    private MyImageIcon      backgroundImg, boyImg, dragonImg, rideImg;
+    private ButtonGroup      bgroup;
+    private MySoundEffect    themeSound, greetSound;
+
+    // working variables - adjust the values as you want
+    private int frameWidth  = 1000, frameHeight = 600;
+    private int boyCurX     = 400, boyCurY      = 300;
+    private int dragonCurX  = 700, dragonCurY   = 200, rideCurY = 0;
+    private int boyWidth    = 100, boyHeight    = 200; 
+    private int dragonWidth = 250, dragonHeight = 200;
+    private int rideWidth   = 400, rideHeight   = 300;
+    private Thread dragonThread, boyThread;
+    private boolean dragonMove = true, boyMove = true, dragonLeft = true, boyLeft = true;
+    private int speed = 1000;
+    private int greetCount;
+
+    public static void main(String[] args) 
+    {
+        new DragonRideFrame();
+    }    
+
+    //////////////////////////////////////////////////////////////////////////
+    public DragonRideFrame()
+    {   
+        setTitle("Train Your Dragon");
+        setBounds(50, 50, frameWidth, frameHeight);
+        setResizable(false);
+	setVisible(true);
+        setDefaultCloseOperation( WindowConstants.EXIT_ON_CLOSE );
+
+        
+        // (1) Add WindowListener (anonymous class) 
+        addWindowListener(new WindowAdapter() {
+            public void windowClosing(WindowEvent e) {
+                QuickDialog.show("Final score = " + score);
+            }
+        });
+
+        
+	contentpane = (JPanel)getContentPane();
+	contentpane.setLayout( new BorderLayout() );        
+        AddComponents();
+	setDragonThread();
+        setBoyThread();
+    }
+
+    //////////////////////////////////////////////////////////////////////////
+    public void AddComponents()
+    {
+        backgroundImg = new MyImageIcon("background.jpg").resize(frameWidth, frameHeight);
+	boyImg        = new MyImageIcon("hiccup.png").resize(boyWidth, boyHeight);
+	dragonImg     = new MyImageIcon("toothless.png").resize(dragonWidth, dragonHeight);
+        rideImg       = new MyImageIcon("ride.png").resize(rideWidth, rideHeight);
+
+	drawpane = new JLabel();
+	drawpane.setIcon(backgroundImg);
+        drawpane.setLayout(null);
+
+        boyLabel = new JLabel(boyImg);
+        boyLabel.setBounds(boyCurX, boyCurY, boyWidth, boyHeight);
+        drawpane.add(boyLabel);
+       
+        dragonLabel = new JLabel(dragonImg);
+        dragonLabel.setBounds(dragonCurX, dragonCurY, dragonWidth, dragonHeight);
+        drawpane.add(dragonLabel);
+
+	themeSound = new MySoundEffect("theme.wav"); themeSound.playLoop();
+        greetSound = new MySoundEffect("hey.wav");
+     
+        
+	// 2. Add ItemListener (anonymouse class) to each combo -- set direction
+        String[] dragonDirection = {"Dragon Left", "Dragon Right"};
+        dragonCombo = new JComboBox(dragonDirection);
+        
+        ItemListener dirListener = new ItemListener() {
+            public void itemStateChanged(ItemEvent itemEvent) {
+                int state = itemEvent.getStateChange();
+                if (state == ItemEvent.SELECTED) {
+                    if (speedToggles[0].isSelected()) {
+                        System.out.println("left");
+                        dragonLeft = true;
+                    } else if (speedToggles[1].isSelected()) {
+                        System.out.println("right");
+                        dragonMove = false;
+                    }
+                }
+            }
+        };
+ 
+        speedToggles = new JToggleButton[2];
+        bgroup = new ButtonGroup();
+        speedToggles[0] = new JRadioButton("Left");
+        speedToggles[0].setName("Left");
+        speedToggles[1] = new JRadioButton("Right");
+        speedToggles[1].setName("Right");
+        speedToggles[0].setSelected(true);
+ 
+        for (int i = 0; i < 2; i++) {
+            bgroup.add(speedToggles[i]);
+            speedToggles[i].addItemListener(dirListener);
+        }
+
+
+        String[] boyDirection = {"Boy Left", "Boy Right"};
+        boyCombo = new JComboBox(boyDirection);
+        ItemListener diListener = new ItemListener() {
+            public void itemStateChanged(ItemEvent itemEvent) {
+                int state = itemEvent.getStateChange();
+                if (state == ItemEvent.SELECTED) {
+                    if (speedToggles[0].isSelected()) {
+                        System.out.println("left");
+                        boyLeft = true;
+                    } else if (speedToggles[1].isSelected()) {
+                        System.out.println("right");
+                        boyMove = false;
+                    }
+                }
+            }
+        };
+ 
+        speedToggles = new JToggleButton[2];
+        bgroup = new ButtonGroup();
+        speedToggles[0] = new JRadioButton("Left");
+        speedToggles[0].setName("Left");
+        speedToggles[1] = new JRadioButton("Right");
+        speedToggles[1].setName("Right");
+        speedToggles[0].setSelected(true);
+ 
+        for (int i = 0; i < 2; i++) {
+            bgroup.add(speedToggles[i]);
+            speedToggles[i].addItemListener(diListener);
+        }
+
+        
+
+        // 3. Add ActionListener (anonymous class) to rideButton
+	//    -- If boy and dragon overlap, let the boy ride the dragon
+        //    -- Change dragon's icon, hide boy's icon (or set it to null)
+	rideButton = new JButton("Ride");
+           rideButton = new JButton("Move");
+        rideButton.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                System.out.println("basket move");
+               
+                if (!boyMove) {
+                    setBoyThread();
+                }
+                else {
+                    
+                    Random rand = new Random();
+                    int randX = rand.nextInt(frameWidth - boyWidth);
+                    // int randY = rand.nextInt(frameHeight / 3);
+                    boyLabel.setBounds(boyCurX = dragonCurX, boyCurY = 0, boyWidth, boyHeight);
+                }
+ 
+                boyMove = true;
+            }
+        });
+
+
+		
+        // 4. Add ActionListener (anonymous class) to offButton
+	//    -- If boy is riding dragon, let him get off
+        //    -- Change both icons back, update boy's X-location
+	offButton = new JButton("Get Off");
+        offButton.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                System.out.println("boy stop");
+                boyMove = false;
+            }
+        });
+
+
+        
+	// 5. Add ItemListener (anonymouse class) to each speedToggles -- set speed
+        ItemListener itemListener = new ItemListener() {
+            public void itemStateChanged(ItemEvent itemEvent) {
+                int state = itemEvent.getStateChange();
+                if (state == ItemEvent.SELECTED) {
+                    if (itemEvent.getItem() == "fast") {
+                        System.out.println("select fast");
+                        speed = 300;
+                    } else if (itemEvent.getItem() == "medium") {
+                        System.out.println("select medium");
+                        speed = 1000;
+                    } else if (itemEvent.getItem() == "slow") {
+                        System.out.println("select slow");
+                        speed = 2000;
+                    }
+ 
+                }
+            }
+        };
+        
+        
+        speedToggles = new JToggleButton[5];
+        bgroup = new ButtonGroup();      
+        speedToggles[0] = new JRadioButton("Fast");   speedToggles[0].setName("Fast");
+        speedToggles[1] = new JRadioButton("Medium"); speedToggles[1].setName("Medium"); 
+        speedToggles[2] = new JRadioButton("Slow");   speedToggles[2].setName("Slow");
+        speedToggles[1].setSelected(true);        
+        for (int i=0; i < 3; i++)
+        {
+            bgroup.add( speedToggles[i] );    
+        }                
+
+
+        
+	greetText = new JTextField("0", 5);		
+	greetText.setEditable(false);
+        
+        JPanel control  = new JPanel();
+        control.setBounds(0,0,1000,50);
+        control.setBackground(new Color(102, 204, 0));
+        control.add(dragonCombo);
+        control.add(new JLabel("               "));   
+        control.add(boyCombo);
+        control.add(rideButton); 
+        control.add(offButton);          
+        control.add(new JLabel("               "));        
+        control.add(speedToggles[0]); 
+        control.add(speedToggles[1]); 
+        control.add(speedToggles[2]);   
+        control.add(new JLabel("Greet count : ")); control.add(greetText);
+        contentpane.add(control, BorderLayout.NORTH);
+        contentpane.add(drawpane, BorderLayout.CENTER);      
+        validate();       
+    }
+    
+    //////////////////////////////////////////////////////////////////////////
+    public void setDragonThread()
+    {
+	dragonThread = new Thread() {
+            public void run()
+            {
+		while (dragonMove)
+		{
+                    // Dragon has 2 modes: normal and ride
+                    if (dragonLabel.getIcon() == dragonImg) dragonLabel.setLocation(dragonCurX, dragonCurY);
+                    else                                    dragonLabel.setLocation(dragonCurX, rideCurY);
+                 
+                    if (dragonLeft)
+                    {
+			dragonCurX = dragonCurX - 50;
+			if (dragonCurX < -100)            { dragonCurX = frameWidth; }
+                    }
+                    else
+                    {
+			dragonCurX = dragonCurX + 50;
+			if (dragonCurX > frameWidth-100)  { dragonCurX = 0; }
+                    }
+                    repaint(); 
+                    collision();      // called by either dragon or boy
+   
+                    try { Thread.sleep(speed); } catch (InterruptedException e) { e.printStackTrace(); }
+		} // end while
+            } // end run
+	}; // end thread creation
+	dragonThread.start();
+    }
+
+    public void setBoyThread()
+    {
+	boyThread = new Thread() {
+            public void run()
+            {
+		while (boyMove) {
+                    // (7) Update basket's location
+                    // check bound
+                    if (boyCurY + boyHeight > frameHeight) {
+                        Random rand = new Random();
+                        int randX = rand.nextInt(frameWidth - boyWidth);
+                        // int randY = rand.nextInt(frameHeight / 3);
+                        boyLabel.setBounds(boyCurX = randX, boyCurY = 0, boyWidth, boyHeight);
+                    }
+                   
+                    System.out.println("boy moving");
+                    boyLabel.setBounds(boyCurX, boyCurY += 20, boyWidth, boyHeight);
+                   
+                   
+                    repaint();
+ 
+                }
+            } // end run
+	}; // end thread creation
+	boyThread.start();        
+    }    
+    //////////////////////////////////////////////////////////////////////////   
+    synchronized public void collision()
+    {
+        // 7. Make greet sound & update greet count when boy and dragon overlap
+    }
+} // end class
+
+//////////////////////////////////////////////////////////////////////////
+
+// quick dialog
+class QuickDialog {
+ 
+    public static void show(String message) {
+        JOptionPane.showMessageDialog(new JFrame(), message, "Quick Dialog",
+                JOptionPane.INFORMATION_MESSAGE);
+    }
+};
+
+// Auxiliary class to resize image
+class MyImageIcon extends ImageIcon
+{
+    public MyImageIcon(String fname)  { super(fname); }
+    public MyImageIcon(Image image)   { super(image); }
+
+    public MyImageIcon resize(int width, int height)
+    {
+	Image oldimg = this.getImage();
+	Image newimg = oldimg.getScaledInstance(width, height, java.awt.Image.SCALE_SMOOTH);
+	return new MyImageIcon(newimg);
+    }
+};
+
+
+// Auxiliary class to play sound effect (support .wav or .mid file)
+class MySoundEffect
+{
+    private java.applet.AudioClip audio;
+
+    public MySoundEffect(String filename)
+    {
+	try
+	{
+            java.io.File file = new java.io.File(filename);
+            audio = java.applet.Applet.newAudioClip(file.toURL());
+	}
+	catch (Exception e) { e.printStackTrace(); }
+    }
+    public void playOnce()   { audio.play(); }
+    public void playLoop()   { audio.loop(); }
+    public void stop()       { audio.stop(); }
+}
